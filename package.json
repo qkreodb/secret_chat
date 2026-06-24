@@ -1,0 +1,31 @@
+{
+  "name": "secret-lan-chat",
+  "version": "1.0.0",
+  "description": "외부 서버 없이 동일 LAN 안에서 비밀리에 소통하는 데스크톱 채팅 (Electron)",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.local.secretlanchat",
+    "productName": "Secret LAN Chat",
+    "files": [
+      "main.js",
+      "preload.js",
+      "network.js",
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    }
+  },
+  "devDependencies": {
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3"
+  }
+}

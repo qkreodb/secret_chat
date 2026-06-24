@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+  <title>Secret LAN Chat</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ===================== 상단 컨트롤 바 ===================== -->
+  <header id="topbar">
+    <div class="brand">🔒 Secret LAN Chat</div>
+    <div class="top-controls">
+      <button id="btnPin" class="icon-btn" title="항상 위에 표시">📌</button>
+      <div class="opacity-wrap" title="투명도 조절">
+        <span class="op-ico">🌓</span>
+        <input id="opacity" type="range" min="20" max="100" value="100" />
+        <span id="opacityVal">100%</span>
+      </div>
+      <button id="btnTray" class="icon-btn" title="트레이로 숨기기">🗕</button>
+    </div>
+  </header>
+
+  <main id="content">
+
+    <!-- ===================== 1) 이름 입력 ===================== -->
+    <section id="view-name" class="view active">
+      <div class="card">
+        <h1>비밀 LAN 채팅</h1>
+        <p class="sub">같은 네트워크 안에서 외부 서버 없이 대화합니다.</p>
+        <label>사용자 이름</label>
+        <input id="inpName" type="text" maxlength="24" placeholder="표시될 이름을 입력하세요" />
+        <button id="btnNameNext" class="primary">시작하기</button>
+      </div>
+    </section>
+
+    <!-- ===================== 2) 메뉴(개설/참가) ===================== -->
+    <section id="view-menu" class="view">
+      <div class="card">
+        <h2>안녕하세요, <span id="helloName" class="accent"></span> 님</h2>
+        <div class="menu-grid">
+          <button id="btnGoCreate" class="big-btn">➕<br/>방 개설<br/><small>방장이 됩니다</small></button>
+          <button id="btnGoJoin" class="big-btn">🔍<br/>방 참가<br/><small>방 목록 탐색</small></button>
+        </div>
+        <button class="link" data-back="view-name">← 이름 다시 입력</button>
+      </div>
+    </section>
+
+    <!-- ===================== 3) 방 개설 ===================== -->
+    <section id="view-create" class="view">
+      <div class="card">
+        <h2>방 개설</h2>
+        <label>방 이름</label>
+        <input id="inpRoomName" type="text" maxlength="40" placeholder="방 이름 (필수)" />
+        <label>비밀번호</label>
+        <input id="inpRoomPw" type="password" maxlength="40" placeholder="비밀번호 (필수)" />
+        <label class="check">
+          <input id="inpHidden" type="checkbox" />
+          목록에서 숨김 (비공개방 — IP와 비밀번호로만 입장)
+        </label>
+        <div class="row-btns">
+          <button class="link" data-back="view-menu">← 뒤로</button>
+          <button id="btnCreate" class="primary">개설하기</button>
+        </div>
+        <div id="createErr" class="err"></div>
+      </div>
+    </section>
+
+    <!-- ===================== 4) 방 참가 ===================== -->
+    <section id="view-join" class="view">
+      <div class="card wide">
+        <h2>방 참가</h2>
+
+        <div class="join-cols">
+          <!-- 자동 탐색 -->
+          <div class="join-col">
+            <div class="col-head">
+              <span>공개방 목록</span>
+              <button id="btnRescan" class="mini">↻ 새로고침</button>
+            </div>
+            <ul id="roomList" class="room-list">
+              <li class="empty">탐색 중...</li>
+            </ul>
+          </div>
+
+          <!-- 수동 입장 -->
+          <div class="join-col">
+            <div class="col-head"><span>직접 입장 (비공개방)</span></div>
+            <label>방장 IP 주소</label>
+            <input id="inpHostIp" type="text" placeholder="예: 192.168.0.12" />
+            <label>포트 <small>(기본 47655)</small></label>
+            <input id="inpHostPort" type="text" placeholder="47655" />
+            <label>비밀번호</label>
+            <input id="inpJoinPw" type="password" maxlength="40" placeholder="비밀번호" />
+            <button id="btnManualJoin" class="primary">입장</button>
+          </div>
+        </div>
+
+        <button class="link" data-back="view-menu">← 뒤로</button>
+        <div id="joinErr" class="err"></div>
+      </div>
+    </section>
+
+    <!-- ===================== 5) 채팅 ===================== -->
+    <section id="view-chat" class="view chat-view">
+      <div class="chat-main">
+        <div class="chat-head">
+          <div>
+            <span id="chatRoomName" class="room-title"></span>
+            <span id="chatRoomMeta" class="room-meta"></span>
+          </div>
+          <button id="btnLeave" class="mini danger">나가기</button>
+        </div>
+        <div id="messages" class="messages"></div>
+        <div class="composer">
+          <textarea id="inpMsg" rows="1" placeholder="메시지 입력 후 Enter (Shift+Enter 줄바꿈)"></textarea>
+          <button id="btnSend" class="primary">전송</button>
+        </div>
+      </div>
+      <aside class="sidebar">
+        <div class="sb-head">접속자 <span id="userCount" class="badge">0</span></div>
+        <ul id="userList" class="user-list"></ul>
+      </aside>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

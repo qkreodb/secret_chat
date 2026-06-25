@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
   <title>Secret LAN Chat</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -114,7 +114,14 @@
           <button id="btnLeave" class="mini danger">나가기</button>
         </div>
         <div id="messages" class="messages"></div>
+        <div id="dropHint" class="drop-hint">여기에 파일을 놓아 전송</div>
+        <div id="emojiPanel" class="emoji-panel hidden">
+          <div id="emojiTabs" class="emoji-tabs"></div>
+          <div id="emojiGrid" class="emoji-grid"></div>
+        </div>
         <div class="composer">
+          <button id="btnEmoji" class="composer-icon" title="이모티콘">😊</button>
+          <button id="btnAttach" class="composer-icon" title="파일 첨부">📎</button>
           <textarea id="inpMsg" rows="1" placeholder="메시지 입력 후 Enter (Shift+Enter 줄바꿈)"></textarea>
           <button id="btnSend" class="primary">전송</button>
         </div>

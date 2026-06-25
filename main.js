@@ -1,11 +1,14 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const {
-  app, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage,
+  app, BrowserWindow, ipcMain, Tray, Menu, Notification, nativeImage, dialog,
 } = require('electron');
 
-const { HostSession, ClientSession, discoverRooms, getLocalIPv4 } = require('./network');
+const {
+  HostSession, ClientSession, discoverRooms, getLocalIPv4, MAX_FILE_BYTES,
+} = require('./network');
 
 // Windows 토스트 알림에 앱 이름이 제대로 뜨도록 AppUserModelID 지정
 app.setAppUserModelId('com.local.secretlanchat');
@@ -112,6 +115,10 @@ function wireSession(s) {
     send('chat-message', m);
     if (!m.self) notifyIfBackground(`${m.username} (${currentRoomName})`, m.text);
   });
+  s.on('file', (m) => {
+    send('file-message', m);
+    if (!m.self) notifyIfBackground(`${m.username} (${currentRoomName})`, `📎 ${m.filename}`);
+  });
   s.on('system', (m) => send('system-message', m));
   s.on('users', (users) => send('users-update', users));
   s.on('error', (err) => send('net-error', String(err.message || err)));
@@ -186,6 +193,80 @@ ipcMain.handle('send-message', (_e, text) => {
   if (!t.trim()) return { ok: false };
   session.sendChat(t);
   return { ok: true };
+});
+
+// 파일 첨부 다이얼로그 — 선택된 파일 경로 목록을 반환
+ipcMain.handle('open-file-dialog', async () => {
+  if (!mainWindow) return { ok: false, paths: [] };
+  const r = await dialog.showOpenDialog(mainWindow, {
+    title: '보낼 파일 선택',
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: '이미지', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'] },
+      { name: '문서', extensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'hwp', 'csv'] },
+      { name: '모든 파일', extensions: ['*'] },
+    ],
+  });
+  if (r.canceled) return { ok: true, paths: [] };
+  return { ok: true, paths: r.filePaths };
+});
+
+const MIME_BY_EXT = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+  webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml',
+  pdf: 'application/pdf', txt: 'text/plain', csv: 'text/csv',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  zip: 'application/zip',
+};
+
+function mimeFromName(name) {
+  const ext = path.extname(name).slice(1).toLowerCase();
+  return MIME_BY_EXT[ext] || 'application/octet-stream';
+}
+
+// 파일 경로 목록을 읽어 세션으로 전송. (다이얼로그 선택 또는 드래그&드롭에서 사용)
+ipcMain.handle('send-files', async (_e, paths) => {
+  if (!session) return { ok: false, error: '세션이 없습니다.' };
+  const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
+  const results = [];
+  for (const p of list) {
+    try {
+      const stat = fs.statSync(p);
+      if (!stat.isFile()) { results.push({ path: p, ok: false, error: '파일이 아닙니다.' }); continue; }
+      if (stat.size > MAX_FILE_BYTES) {
+        results.push({ path: p, ok: false, error: '파일이 너무 큽니다 (최대 20MB).' });
+        continue;
+      }
+      const buf = fs.readFileSync(p);
+      const filename = path.basename(p);
+      session.sendFile({
+        filename, mime: mimeFromName(filename), size: stat.size,
+        data: buf.toString('base64'),
+      });
+      results.push({ path: p, ok: true });
+    } catch (err) {
+      results.push({ path: p, ok: false, error: String(err.message || err) });
+    }
+  }
+  return { ok: true, results };
+});
+
+// 수신한 파일을 디스크에 저장 (저장 위치 다이얼로그)
+ipcMain.handle('save-file', async (_e, { filename, data }) => {
+  if (!mainWindow) return { ok: false, error: '창이 없습니다.' };
+  const r = await dialog.showSaveDialog(mainWindow, { defaultPath: filename || 'download' });
+  if (r.canceled || !r.filePath) return { ok: true, canceled: true };
+  try {
+    fs.writeFileSync(r.filePath, Buffer.from(String(data || ''), 'base64'));
+    return { ok: true, path: r.filePath };
+  } catch (err) {
+    return { ok: false, error: String(err.message || err) };
+  }
 });
 
 ipcMain.handle('leave-room', () => {

@@ -123,7 +123,7 @@ button { font-family: inherit; }
 /* ---------- 채팅 ---------- */
 .chat-view { padding: 0; align-items: stretch; justify-content: stretch; }
 .chat-view.active { display: flex; }
-.chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
 .chat-head {
   display: flex; justify-content: space-between; align-items: center;
   padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg2);
@@ -146,10 +146,70 @@ button { font-family: inherit; }
 .sys-row { align-self: center; color: var(--muted); font-size: 12px; background: var(--bg3);
            padding: 4px 12px; border-radius: 12px; margin: 6px 0; }
 
-.composer { display: flex; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line);
-            background: var(--bg2); }
+.composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line);
+            background: var(--bg2); align-items: flex-end; }
 .composer textarea { flex: 1; resize: none; max-height: 120px; line-height: 1.4; }
 .composer .primary { width: auto; margin-top: 0; padding: 10px 20px; align-self: stretch; }
+.composer-icon {
+  background: var(--bg3); border: 1px solid var(--line); color: var(--txt);
+  border-radius: 8px; width: 38px; height: 40px; cursor: pointer; font-size: 18px;
+  flex: none; line-height: 1;
+}
+.composer-icon:hover { background: #3a3e50; }
+.composer-icon.on { background: var(--accent2); border-color: var(--accent); }
+
+/* ---------- 이모지 패널 ---------- */
+.emoji-panel {
+  position: absolute; left: 12px; bottom: 70px; z-index: 50;
+  width: 320px; max-width: calc(100% - 24px);
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45); overflow: hidden;
+}
+.emoji-panel.hidden { display: none; }
+.emoji-tabs { display: flex; gap: 2px; padding: 6px; border-bottom: 1px solid var(--line);
+              background: var(--bg3); }
+.emoji-tab { flex: 1; background: none; border: none; color: var(--muted); cursor: pointer;
+             font-size: 17px; padding: 6px 0; border-radius: 6px; }
+.emoji-tab:hover { background: var(--bg2); }
+.emoji-tab.active { background: var(--bg); color: var(--txt); }
+.emoji-grid {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
+  padding: 8px; max-height: 220px; overflow-y: auto;
+}
+.emoji-grid button {
+  background: none; border: none; cursor: pointer; font-size: 20px;
+  padding: 4px 0; border-radius: 6px; line-height: 1.2;
+}
+.emoji-grid button:hover { background: var(--bg3); }
+
+/* ---------- 파일/이미지 첨부 메시지 ---------- */
+.file-bubble { padding: 6px; max-width: 320px; }
+.img-attach {
+  display: block; max-width: 280px; max-height: 280px; border-radius: 10px;
+  cursor: pointer; object-fit: contain;
+}
+.file-card {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; min-width: 180px;
+}
+.file-card .fc-icon { font-size: 26px; flex: none; }
+.file-card .fc-info { min-width: 0; }
+.file-card .fc-name { font-weight: 600; word-break: break-all; font-size: 13px; }
+.file-card .fc-size { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.file-dl {
+  margin-top: 6px; background: var(--bg3); border: 1px solid var(--line); color: var(--txt);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px;
+}
+.file-dl:hover { background: #3a3e50; }
+.msg-row.me .file-card .fc-size { color: rgba(255,255,255,.75); }
+
+/* ---------- 드래그&드롭 안내 ---------- */
+.drop-hint {
+  position: absolute; inset: 0; z-index: 60; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(30,31,38,.85); border: 2px dashed var(--accent);
+  color: var(--accent); font-size: 16px; font-weight: 600; pointer-events: none;
+}
+.drop-hint.show { display: flex; }
 
 /* ---------- 사이드바 ---------- */
 .sidebar { width: 180px; background: var(--bg2); border-left: 1px solid var(--line);

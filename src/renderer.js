@@ -182,8 +182,130 @@ async function sendMsg() {
 
 $('btnLeave').addEventListener('click', async () => {
   await api.leaveRoom();
+  closeEmoji();
   showView('view-menu');
   toast('방에서 나갔습니다.');
+});
+
+// ---------------------------------------------------------------------------
+// 이모티콘 picker
+// ---------------------------------------------------------------------------
+const EMOJI = {
+  '😊': ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥳','🤩','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🫢','🤭','🤫','😶','😐','😑','😬','🙄','😯','😴','🤤','😪','🤢','🤮','🤧','😷','🤒','🤕','🥱'],
+  '👍': ['👍','👎','👌','🤌','🤏','✌️','🤞','🫰','🤟','🤘','🤙','👈','👉','👆','👇','☝️','👋','🤚','🖐️','✋','🖖','🫶','👏','🙌','🤝','🙏','✊','👊','🤛','🤜','💪','🫵','🤲','👐','🤦','🤷','💁','🙆','🙅','🙋','🧏','💆','💇','🚶','🏃','🕺','💃'],
+  '❤️': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','♥️','💯','✨','⭐','🌟','💫','⚡','🔥','💥','💢','💦','💨','🎉','🎊','🎈','🎁','🏆','🥇','🌈','☀️','⛅','☁️','❄️','🌙','✅','❌','⭕','❗','❓','💤'],
+  '🐶': ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🐤','🦆','🦅','🦉','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐢','🐙','🦑','🦀','🐠','🐟','🐬','🐳','🐋','🌸','🌹','🌻','🌷','🌲','🌳','🍀','🍁'],
+  '🍔': ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🌽','🥕','🍞','🥐','🧀','🍔','🍟','🍕','🌭','🥪','🌮','🌯','🍜','🍝','🍣','🍱','🍙','🍚','🍰','🎂','🧁','🍪','🍫','🍬','🍭','🍩','🍦','☕','🍺','🍻','🥂','🍷'],
+  '⚽': ['⚽','🏀','🏈','⚾','🎾','🏐','🏉','🎱','🏓','🏸','🥅','⛳','🏹','🎣','🥊','🥋','🛹','🛼','🎿','⛸️','🎽','🏆','🏅','🎮','🕹️','🎲','🎯','🎰','🎸','🎹','🎺','🎷','🥁','🎤','🎧','🎬','📱','💻','⌨️','🖥️','📷','💡','🔦','📚','✏️','📌','📎','💰','💳','🔑','🚗','✈️','🚀'],
+};
+const EMOJI_TABS = Object.keys(EMOJI);
+let emojiBuilt = false;
+
+function buildEmojiPanel() {
+  if (emojiBuilt) return;
+  const tabs = $('emojiTabs');
+  EMOJI_TABS.forEach((key, i) => {
+    const b = document.createElement('button');
+    b.className = 'emoji-tab' + (i === 0 ? ' active' : '');
+    b.textContent = key;
+    b.addEventListener('click', () => selectEmojiTab(key, b));
+    tabs.appendChild(b);
+  });
+  renderEmojiGrid(EMOJI_TABS[0]);
+  emojiBuilt = true;
+}
+
+function selectEmojiTab(key, btn) {
+  document.querySelectorAll('.emoji-tab').forEach((t) => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderEmojiGrid(key);
+}
+
+function renderEmojiGrid(key) {
+  const grid = $('emojiGrid');
+  grid.innerHTML = '';
+  EMOJI[key].forEach((emo) => {
+    const b = document.createElement('button');
+    b.textContent = emo;
+    b.addEventListener('click', () => insertEmoji(emo));
+    grid.appendChild(b);
+  });
+  grid.scrollTop = 0;
+}
+
+function insertEmoji(emo) {
+  const t = $('inpMsg');
+  const start = t.selectionStart ?? t.value.length;
+  const end = t.selectionEnd ?? t.value.length;
+  t.value = t.value.slice(0, start) + emo + t.value.slice(end);
+  const pos = start + emo.length;
+  t.selectionStart = t.selectionEnd = pos;
+  t.focus();
+  t.dispatchEvent(new Event('input')); // 높이 자동조절 반영
+}
+
+function openEmoji() {
+  buildEmojiPanel();
+  $('emojiPanel').classList.remove('hidden');
+  $('btnEmoji').classList.add('on');
+}
+function closeEmoji() {
+  $('emojiPanel').classList.add('hidden');
+  $('btnEmoji').classList.remove('on');
+}
+
+$('btnEmoji').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if ($('emojiPanel').classList.contains('hidden')) openEmoji();
+  else closeEmoji();
+});
+// 패널 바깥 클릭 시 닫기
+document.addEventListener('click', (e) => {
+  const panel = $('emojiPanel');
+  if (panel.classList.contains('hidden')) return;
+  if (panel.contains(e.target) || e.target === $('btnEmoji')) return;
+  closeEmoji();
+});
+
+// ---------------------------------------------------------------------------
+// 파일 전송 (첨부 버튼 + 드래그&드롭)
+// ---------------------------------------------------------------------------
+$('btnAttach').addEventListener('click', async () => {
+  const res = await api.openFileDialog();
+  if (!res || !res.ok || !res.paths.length) return;
+  await sendFilePaths(res.paths);
+});
+
+async function sendFilePaths(paths) {
+  const res = await api.sendFiles(paths);
+  if (!res || !res.ok) { toast('파일 전송 실패: ' + ((res && res.error) || '')); return; }
+  const failed = (res.results || []).filter((r) => !r.ok);
+  if (failed.length) toast(failed[0].error || '일부 파일을 보내지 못했습니다.');
+}
+
+// 드래그&드롭 — Electron 은 File.path 로 실제 경로 제공
+const chatMain = document.querySelector('.chat-main');
+let dragDepth = 0;
+chatMain.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  dragDepth++;
+  if ($('view-chat').classList.contains('active')) $('dropHint').classList.add('show');
+});
+chatMain.addEventListener('dragover', (e) => e.preventDefault());
+chatMain.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) $('dropHint').classList.remove('show');
+});
+chatMain.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  dragDepth = 0;
+  $('dropHint').classList.remove('show');
+  if (!$('view-chat').classList.contains('active')) return;
+  const paths = Array.from(e.dataTransfer.files || [])
+    .map((f) => f.path)
+    .filter(Boolean);
+  if (paths.length) await sendFilePaths(paths);
 });
 
 // ---------------------------------------------------------------------------
@@ -209,6 +331,72 @@ function addChat({ username, text, ts, self }) {
   row.appendChild(time);
 
   appendRow(row);
+}
+
+function addFile({ username, filename, mime, size, data, ts, self }) {
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + (self ? 'me' : 'other');
+  if (!self) {
+    const name = document.createElement('div');
+    name.className = 'msg-name';
+    name.textContent = username;
+    row.appendChild(name);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble file-bubble';
+
+  if (mime && mime.startsWith('image/')) {
+    const img = document.createElement('img');
+    img.className = 'img-attach';
+    img.src = `data:${mime};base64,${data}`;
+    img.title = `${filename} (${formatSize(size)}) — 클릭하여 저장`;
+    img.addEventListener('click', () => downloadFile(filename, data));
+    bubble.appendChild(img);
+  } else {
+    const card = document.createElement('div');
+    card.className = 'file-card';
+
+    const icon = document.createElement('div');
+    icon.className = 'fc-icon';
+    icon.textContent = fileIcon(mime, filename);
+    card.appendChild(icon);
+
+    const info = document.createElement('div');
+    info.className = 'fc-info';
+    const nm = document.createElement('div');
+    nm.className = 'fc-name';
+    nm.textContent = filename;
+    const sz = document.createElement('div');
+    sz.className = 'fc-size';
+    sz.textContent = formatSize(size);
+    info.appendChild(nm);
+    info.appendChild(sz);
+
+    const dl = document.createElement('button');
+    dl.className = 'file-dl';
+    dl.textContent = '⤓ 저장';
+    dl.addEventListener('click', () => downloadFile(filename, data));
+    info.appendChild(dl);
+
+    card.appendChild(info);
+    bubble.appendChild(card);
+  }
+
+  row.appendChild(bubble);
+
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = formatTime(ts);
+  row.appendChild(time);
+
+  appendRow(row);
+}
+
+async function downloadFile(filename, data) {
+  const res = await api.saveFile({ filename, data });
+  if (res && res.ok && !res.canceled) toast('저장됨: ' + res.path);
+  else if (res && !res.ok) toast('저장 실패: ' + (res.error || ''));
 }
 
 function addSystem(text) {
@@ -242,6 +430,7 @@ function renderUsers(users) {
 // 메인 프로세스 이벤트 구독
 // ---------------------------------------------------------------------------
 api.onChat((m) => addChat(m));
+api.onFile((m) => addFile(m));
 api.onSystem((m) => addSystem(m.text));
 api.onUsers((users) => renderUsers(users));
 api.onDisconnected((info) => {
@@ -284,6 +473,27 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+function formatSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function fileIcon(mime, filename) {
+  const m = String(mime || '');
+  const ext = String(filename || '').split('.').pop().toLowerCase();
+  if (m === 'application/pdf' || ext === 'pdf') return '📕';
+  if (m.startsWith('video/')) return '🎬';
+  if (m.startsWith('audio/')) return '🎵';
+  if (m.startsWith('text/') || ext === 'txt') return '📄';
+  if (['doc', 'docx'].includes(ext)) return '📘';
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return '📗';
+  if (['ppt', 'pptx'].includes(ext)) return '📙';
+  if (['zip', 'rar', '7z'].includes(ext)) return '🗜️';
+  return '📎';
 }
 
 // 시작 시 이름 입력란 포커스

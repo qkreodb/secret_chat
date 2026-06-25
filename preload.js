@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld('chatAPI', {
   // 메시지
   sendMessage: (text) => ipcRenderer.invoke('send-message', text),
 
+  // 파일
+  openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
+  sendFiles: (paths) => ipcRenderer.invoke('send-files', paths),
+  saveFile: (file) => ipcRenderer.invoke('save-file', file),
+
   // 창 제어
   setAlwaysOnTop: (v) => ipcRenderer.invoke('set-always-on-top', v),
   setOpacity: (v) => ipcRenderer.invoke('set-opacity', v),
@@ -21,6 +26,7 @@ contextBridge.exposeInMainWorld('chatAPI', {
 
   // 메인 → 렌더러 이벤트 구독
   onChat: (cb) => ipcRenderer.on('chat-message', (_e, m) => cb(m)),
+  onFile: (cb) => ipcRenderer.on('file-message', (_e, m) => cb(m)),
   onSystem: (cb) => ipcRenderer.on('system-message', (_e, m) => cb(m)),
   onUsers: (cb) => ipcRenderer.on('users-update', (_e, u) => cb(u)),
   onDisconnected: (cb) => ipcRenderer.on('disconnected', (_e, m) => cb(m)),

@@ -23,6 +23,30 @@ const TCP_BASE_PORT = 47655;           // TCP 채팅 서버 시작 포트 (사�
 const TCP_PORT_TRIES = 50;
 const DISCOVERY_MAGIC = 'SECRET_LAN_CHAT_v1';
 
+// 파일 전송 한도. base64 는 원본의 약 4/3 크기이므로 원본 20MB ≒ base64 ~27MB.
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_FILE_B64 = Math.ceil(MAX_FILE_BYTES * 1.4);
+
+function fileId() {
+  return crypto.randomBytes(8).toString('hex');
+}
+
+// 들어온 FILE 메시지를 안전한 형태로 정규화한다 (필수 필드/타입/크기 검증).
+function normalizeFile(msg, username) {
+  const data = String(msg.data || '');
+  if (!data || data.length > MAX_FILE_B64) return null;
+  return {
+    type: 'FILE',
+    id: String(msg.id || fileId()),
+    username,
+    filename: String(msg.filename || 'file').slice(0, 255),
+    mime: String(msg.mime || 'application/octet-stream').slice(0, 128),
+    size: Number(msg.size) || 0,
+    data,
+    ts: Date.now(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // 공용 유틸
 // ---------------------------------------------------------------------------
@@ -124,6 +148,17 @@ class HostSession extends EventEmitter {
     this.emit('chat', { username: this.username, text: msg.text, ts: msg.ts, self: true });
   }
 
+  // 방장 본인이 보낸 파일 전송
+  sendFile(file) {
+    const msg = {
+      type: 'FILE', id: fileId(), username: this.username,
+      filename: file.filename, mime: file.mime, size: file.size,
+      data: file.data, ts: Date.now(),
+    };
+    this.broadcast(msg);
+    this.emit('file', { ...msg, self: true });
+  }
+
   start() {
     return new Promise((resolve, reject) => {
       this.server = net.createServer((socket) => this._onConnection(socket));
@@ -194,6 +229,14 @@ class HostSession extends EventEmitter {
         const out = { type: 'CHAT', username: info.username, text, ts: Date.now() };
         this.broadcast(out, socket);              // 다른 클라이언트들에게
         this.emit('chat', { username: info.username, text, ts: out.ts, self: false }); // 방장 UI
+        return;
+      }
+
+      if (msg.type === 'FILE') {
+        const out = normalizeFile(msg, info.username);
+        if (!out) return;
+        this.broadcast(out, socket);              // 다른 클라이언트들에게 중계
+        this.emit('file', { ...out, self: false }); // 방장 UI
       }
     };
 
@@ -349,6 +392,18 @@ class ClientSession extends EventEmitter {
       case 'USERS':
         this.emit('users', msg.users || []);
         break;
+      case 'FILE':
+        this.emit('file', {
+          id: msg.id,
+          username: msg.username,
+          filename: msg.filename,
+          mime: msg.mime,
+          size: msg.size,
+          data: msg.data,
+          ts: msg.ts,
+          self: msg.username === this.assignedName,
+        });
+        break;
     }
   }
 
@@ -356,6 +411,18 @@ class ClientSession extends EventEmitter {
     sendJSON(this.socket, { type: 'CHAT', text });
     // 본인 메시지는 즉시 화면에 반영 (서버는 발신자에게 echo 하지 않음)
     this.emit('chat', { username: this.assignedName, text, ts: Date.now(), self: true });
+  }
+
+  sendFile(file) {
+    sendJSON(this.socket, {
+      type: 'FILE', filename: file.filename, mime: file.mime,
+      size: file.size, data: file.data,
+    });
+    // 본인이 보낸 파일은 즉시 화면에 반영 (서버 echo 없음)
+    this.emit('file', {
+      username: this.assignedName, filename: file.filename, mime: file.mime,
+      size: file.size, data: file.data, ts: Date.now(), self: true,
+    });
   }
 
   stop() {
@@ -407,4 +474,5 @@ module.exports = {
   getLocalIPv4,
   DISCOVERY_PORT,
   TCP_BASE_PORT,
+  MAX_FILE_BYTES,
 };

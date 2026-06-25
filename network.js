@@ -27,8 +27,35 @@ const DISCOVERY_MAGIC = 'SECRET_LAN_CHAT_v1';
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_FILE_B64 = Math.ceil(MAX_FILE_BYTES * 1.4);
 
-function fileId() {
+function newId() {
   return crypto.randomBytes(8).toString('hex');
+}
+
+// 답장 인용 정보를 안전한 형태로 정규화 (없으면 null).
+function sanitizeReply(r) {
+  if (!r || typeof r !== 'object') return null;
+  const id = String(r.id || '').slice(0, 32);
+  if (!id) return null;
+  return {
+    id,
+    username: String(r.username || '').slice(0, 24),
+    preview: String(r.preview || '').slice(0, 80),
+  };
+}
+
+// 핀(고정) 항목을 안전한 형태로 정규화 (파일 본문 data 는 포함하지 않음).
+function sanitizePinItem(it) {
+  if (!it || typeof it !== 'object') return null;
+  const id = String(it.id || '').slice(0, 32);
+  if (!id) return null;
+  return {
+    id,
+    msgType: it.msgType === 'FILE' ? 'FILE' : 'CHAT',
+    username: String(it.username || '').slice(0, 24),
+    text: String(it.text || '').slice(0, 200),
+    filename: String(it.filename || '').slice(0, 255),
+    ts: Number(it.ts) || Date.now(),
+  };
 }
 
 // 들어온 FILE 메시지를 안전한 형태로 정규화한다 (필수 필드/타입/크기 검증).
@@ -37,12 +64,13 @@ function normalizeFile(msg, username) {
   if (!data || data.length > MAX_FILE_B64) return null;
   return {
     type: 'FILE',
-    id: String(msg.id || fileId()),
+    id: String(msg.id || newId()),
     username,
     filename: String(msg.filename || 'file').slice(0, 255),
     mime: String(msg.mime || 'application/octet-stream').slice(0, 128),
     size: Number(msg.size) || 0,
     data,
+    replyTo: sanitizeReply(msg.replyTo),
     ts: Date.now(),
   };
 }
@@ -118,6 +146,30 @@ class HostSession extends EventEmitter {
     this.clients = new Map(); // socket -> { username }
     this.server = null;
     this.udp = null;
+    this.pinned = new Map();   // id -> 핀 항목 (입장 순서 유지)
+  }
+
+  pinnedList() {
+    return Array.from(this.pinned.values());
+  }
+
+  // 핀 적용 + 전체 동기화 (방장 본인 동작과 클라이언트 요청 둘 다 여기로)
+  setPin(action, item) {
+    const it = sanitizePinItem(item);
+    if (!it) return;
+    if (action === 'unpin') {
+      this.pinned.delete(it.id);
+    } else {
+      this.pinned.delete(it.id);     // 중복 제거 후 맨 뒤로
+      this.pinned.set(it.id, it);
+      const MAX_PINS = 20;
+      while (this.pinned.size > MAX_PINS) {
+        this.pinned.delete(this.pinned.keys().next().value);
+      }
+    }
+    const payload = { type: 'PIN', action, item: it, pinned: this.pinnedList() };
+    this.broadcast(payload);
+    this.emit('pin', { action, item: it, pinned: this.pinnedList() });
   }
 
   // 모든 접속자 이름 목록 (방장 본인 포함, 방장이 맨 앞)
@@ -142,18 +194,21 @@ class HostSession extends EventEmitter {
   }
 
   // 방장 본인이 입력한 메시지 전송
-  sendChat(text) {
-    const msg = { type: 'CHAT', username: this.username, text, ts: Date.now() };
+  sendChat(text, replyTo) {
+    const msg = {
+      type: 'CHAT', id: newId(), username: this.username, text,
+      replyTo: sanitizeReply(replyTo), ts: Date.now(),
+    };
     this.broadcast(msg);
-    this.emit('chat', { username: this.username, text: msg.text, ts: msg.ts, self: true });
+    this.emit('chat', { ...msg, self: true });
   }
 
   // 방장 본인이 보낸 파일 전송
-  sendFile(file) {
+  sendFile(file, replyTo) {
     const msg = {
-      type: 'FILE', id: fileId(), username: this.username,
+      type: 'FILE', id: newId(), username: this.username,
       filename: file.filename, mime: file.mime, size: file.size,
-      data: file.data, ts: Date.now(),
+      data: file.data, replyTo: sanitizeReply(replyTo), ts: Date.now(),
     };
     this.broadcast(msg);
     this.emit('file', { ...msg, self: true });
@@ -215,6 +270,7 @@ class HostSession extends EventEmitter {
           roomName: this.roomName,
           username: name,
           users: this.userList(),
+          pinned: this.pinnedList(),
         });
         const sysText = `${name} 님이 입장했습니다.`;
         this.broadcast({ type: 'SYSTEM', text: sysText, ts: Date.now() }, socket);
@@ -226,9 +282,12 @@ class HostSession extends EventEmitter {
       if (msg.type === 'CHAT') {
         const text = String(msg.text || '');
         if (!text) return;
-        const out = { type: 'CHAT', username: info.username, text, ts: Date.now() };
+        const out = {
+          type: 'CHAT', id: String(msg.id || newId()), username: info.username,
+          text, replyTo: sanitizeReply(msg.replyTo), ts: Date.now(),
+        };
         this.broadcast(out, socket);              // 다른 클라이언트들에게
-        this.emit('chat', { username: info.username, text, ts: out.ts, self: false }); // 방장 UI
+        this.emit('chat', { ...out, self: false }); // 방장 UI
         return;
       }
 
@@ -237,6 +296,11 @@ class HostSession extends EventEmitter {
         if (!out) return;
         this.broadcast(out, socket);              // 다른 클라이언트들에게 중계
         this.emit('file', { ...out, self: false }); // 방장 UI
+        return;
+      }
+
+      if (msg.type === 'PIN') {
+        this.setPin(msg.action, msg.item); // 권위적 적용 + 전체 동기화
       }
     };
 
@@ -356,6 +420,7 @@ class ClientSession extends EventEmitter {
             this.roomName = msg.roomName;
             this.assignedName = msg.username || this.username;
             this.emit('users', msg.users || []);
+            this.emit('pin', { pinned: msg.pinned || [] }); // 입장 시 현재 고정 목록 반영
             resolve({ roomName: this.roomName, username: this.assignedName, users: msg.users || [] });
             return;
           }
@@ -380,8 +445,10 @@ class ClientSession extends EventEmitter {
     switch (msg.type) {
       case 'CHAT':
         this.emit('chat', {
+          id: msg.id,
           username: msg.username,
           text: msg.text,
+          replyTo: msg.replyTo || null,
           ts: msg.ts,
           self: msg.username === this.assignedName,
         });
@@ -400,29 +467,43 @@ class ClientSession extends EventEmitter {
           mime: msg.mime,
           size: msg.size,
           data: msg.data,
+          replyTo: msg.replyTo || null,
           ts: msg.ts,
           self: msg.username === this.assignedName,
         });
         break;
+      case 'PIN':
+        this.emit('pin', { action: msg.action, item: msg.item, pinned: msg.pinned || [] });
+        break;
     }
   }
 
-  sendChat(text) {
-    sendJSON(this.socket, { type: 'CHAT', text });
+  sendChat(text, replyTo) {
+    // 발신자가 id 를 만들어 자신·다른 피어가 같은 id 를 공유하게 한다 (답장/고정용).
+    const id = newId();
+    const reply = sanitizeReply(replyTo);
+    sendJSON(this.socket, { type: 'CHAT', id, text, replyTo: reply });
     // 본인 메시지는 즉시 화면에 반영 (서버는 발신자에게 echo 하지 않음)
-    this.emit('chat', { username: this.assignedName, text, ts: Date.now(), self: true });
+    this.emit('chat', { id, username: this.assignedName, text, replyTo: reply, ts: Date.now(), self: true });
   }
 
-  sendFile(file) {
+  sendFile(file, replyTo) {
+    const id = newId();
+    const reply = sanitizeReply(replyTo);
     sendJSON(this.socket, {
-      type: 'FILE', filename: file.filename, mime: file.mime,
-      size: file.size, data: file.data,
+      type: 'FILE', id, filename: file.filename, mime: file.mime,
+      size: file.size, data: file.data, replyTo: reply,
     });
     // 본인이 보낸 파일은 즉시 화면에 반영 (서버 echo 없음)
     this.emit('file', {
-      username: this.assignedName, filename: file.filename, mime: file.mime,
-      size: file.size, data: file.data, ts: Date.now(), self: true,
+      id, username: this.assignedName, filename: file.filename, mime: file.mime,
+      size: file.size, data: file.data, replyTo: reply, ts: Date.now(), self: true,
     });
+  }
+
+  // 핀 요청은 호스트로 보내고, 화면 반영은 호스트의 PIN 브로드캐스트를 기다린다 (권위 일원화).
+  setPin(action, item) {
+    sendJSON(this.socket, { type: 'PIN', action, item });
   }
 
   stop() {

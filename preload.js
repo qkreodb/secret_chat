@@ -12,12 +12,15 @@ contextBridge.exposeInMainWorld('chatAPI', {
   getLocalIP: () => ipcRenderer.invoke('get-local-ip'),
 
   // 메시지
-  sendMessage: (text) => ipcRenderer.invoke('send-message', text),
+  sendMessage: (text, replyTo) => ipcRenderer.invoke('send-message', { text, replyTo }),
 
   // 파일
   openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
-  sendFiles: (paths) => ipcRenderer.invoke('send-files', paths),
+  sendFiles: (paths, replyTo) => ipcRenderer.invoke('send-files', { paths, replyTo }),
   saveFile: (file) => ipcRenderer.invoke('save-file', file),
+
+  // 고정(핀)
+  setPin: (action, item) => ipcRenderer.invoke('set-pin', { action, item }),
 
   // 창 제어
   setAlwaysOnTop: (v) => ipcRenderer.invoke('set-always-on-top', v),
@@ -27,6 +30,7 @@ contextBridge.exposeInMainWorld('chatAPI', {
   // 메인 → 렌더러 이벤트 구독
   onChat: (cb) => ipcRenderer.on('chat-message', (_e, m) => cb(m)),
   onFile: (cb) => ipcRenderer.on('file-message', (_e, m) => cb(m)),
+  onPin: (cb) => ipcRenderer.on('pin-update', (_e, m) => cb(m)),
   onSystem: (cb) => ipcRenderer.on('system-message', (_e, m) => cb(m)),
   onUsers: (cb) => ipcRenderer.on('users-update', (_e, u) => cb(u)),
   onDisconnected: (cb) => ipcRenderer.on('disconnected', (_e, m) => cb(m)),

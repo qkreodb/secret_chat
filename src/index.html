@@ -113,11 +113,20 @@
           </div>
           <button id="btnLeave" class="mini danger">나가기</button>
         </div>
+        <div id="pinBar" class="pin-bar hidden"></div>
         <div id="messages" class="messages"></div>
         <div id="dropHint" class="drop-hint">여기에 파일을 놓아 전송</div>
         <div id="emojiPanel" class="emoji-panel hidden">
           <div id="emojiTabs" class="emoji-tabs"></div>
           <div id="emojiGrid" class="emoji-grid"></div>
+        </div>
+        <div id="replyBar" class="reply-bar hidden">
+          <div class="rb-body">
+            <span class="rb-label">답장</span>
+            <span id="replyName" class="rb-name"></span>
+            <span id="replyPreview" class="rb-preview"></span>
+          </div>
+          <button id="btnCancelReply" class="rb-cancel" title="답장 취소">✕</button>
         </div>
         <div class="composer">
           <button id="btnEmoji" class="composer-icon" title="이모티콘">😊</button>
@@ -135,6 +144,7 @@
   </main>
 
   <div id="toast" class="toast"></div>
+  <div id="ctxMenu" class="ctx-menu hidden"></div>
 
   <script src="renderer.js"></script>
 </body>

@@ -211,6 +211,85 @@ button { font-family: inherit; }
 }
 .drop-hint.show { display: flex; }
 
+/* ---------- 답장(Reply) ---------- */
+.msg-row { position: relative; }
+.msg-actions {
+  position: absolute; top: 0; display: none; gap: 2px; z-index: 5;
+}
+.msg-row.other .msg-actions { right: -30px; }
+.msg-row.me .msg-actions { left: -30px; }
+.msg-row:hover .msg-actions { display: flex; }
+.msg-actions button {
+  background: var(--bg3); border: 1px solid var(--line); color: var(--txt);
+  border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 13px;
+  line-height: 1; padding: 0;
+}
+.msg-actions button:hover { background: #3a3e50; border-color: var(--accent); }
+
+/* 말풍선 안 인용 */
+.reply-quote {
+  border-left: 3px solid var(--accent); padding: 3px 8px; margin-bottom: 5px;
+  background: rgba(0,0,0,.18); border-radius: 6px; cursor: pointer; max-width: 100%;
+}
+.reply-quote .rq-name { font-size: 11px; font-weight: 700; color: var(--accent); display: block; }
+.reply-quote .rq-text { font-size: 12px; color: var(--muted); display: block;
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg-row.me .reply-quote .rq-name { color: #cdd7ff; }
+.msg-row.me .reply-quote .rq-text { color: rgba(255,255,255,.8); }
+
+/* 점프 하이라이트 */
+@keyframes flashMsg { 0%,100% { background: transparent; } 30% { background: rgba(108,140,255,.28); } }
+.msg-row.flash { animation: flashMsg 1.2s ease; border-radius: 10px; }
+
+/* 작성창 위 답장 미리보기 바 */
+.reply-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-top: 1px solid var(--line); background: var(--bg3);
+}
+.reply-bar.hidden { display: none; }
+.reply-bar .rb-body { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px;
+                      border-left: 3px solid var(--accent); padding-left: 8px; }
+.reply-bar .rb-label { font-size: 11px; color: var(--accent); font-weight: 700; flex: none; }
+.reply-bar .rb-name { font-size: 12px; font-weight: 600; flex: none; }
+.reply-bar .rb-preview { font-size: 12px; color: var(--muted);
+                         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reply-bar .rb-cancel { background: none; border: none; color: var(--muted); cursor: pointer;
+                        font-size: 14px; flex: none; }
+.reply-bar .rb-cancel:hover { color: var(--txt); }
+
+/* ---------- 고정(핀) 바 ---------- */
+.pin-bar {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 12px; background: var(--bg3); border-bottom: 1px solid var(--line);
+  max-height: 132px; overflow-y: auto;
+}
+.pin-bar.hidden { display: none; }
+.pin-item {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+}
+.pin-item:hover { border-color: var(--accent); }
+.pin-item .pi-icon { flex: none; font-size: 14px; }
+.pin-item .pi-text { flex: 1; min-width: 0; font-size: 12px;
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pin-item .pi-name { color: var(--accent); font-weight: 600; margin-right: 6px; }
+.pin-item .pi-unpin { background: none; border: none; color: var(--muted); cursor: pointer;
+                      font-size: 13px; flex: none; }
+.pin-item .pi-unpin:hover { color: var(--danger); }
+
+/* ---------- 우클릭 컨텍스트 메뉴 ---------- */
+.ctx-menu {
+  position: fixed; z-index: 200; min-width: 140px;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.45); padding: 4px; overflow: hidden;
+}
+.ctx-menu.hidden { display: none; }
+.ctx-menu button {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  color: var(--txt); cursor: pointer; padding: 8px 12px; font-size: 13px; border-radius: 6px;
+}
+.ctx-menu button:hover { background: var(--bg3); }
+
 /* ---------- 사이드바 ---------- */
 .sidebar { width: 180px; background: var(--bg2); border-left: 1px solid var(--line);
            display: flex; flex-direction: column; }

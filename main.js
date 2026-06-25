@@ -119,6 +119,7 @@ function wireSession(s) {
     send('file-message', m);
     if (!m.self) notifyIfBackground(`${m.username} (${currentRoomName})`, `📎 ${m.filename}`);
   });
+  s.on('pin', (m) => send('pin-update', m));
   s.on('system', (m) => send('system-message', m));
   s.on('users', (users) => send('users-update', users));
   s.on('error', (err) => send('net-error', String(err.message || err)));
@@ -187,11 +188,18 @@ ipcMain.handle('join-room', async (_e, opts) => {
   }
 });
 
-ipcMain.handle('send-message', (_e, text) => {
+ipcMain.handle('send-message', (_e, payload) => {
   if (!session) return { ok: false, error: '세션이 없습니다.' };
+  const { text, replyTo } = (payload && typeof payload === 'object') ? payload : { text: payload };
   const t = String(text || '').slice(0, 4000);
   if (!t.trim()) return { ok: false };
-  session.sendChat(t);
+  session.sendChat(t, replyTo || null);
+  return { ok: true };
+});
+
+ipcMain.handle('set-pin', (_e, { action, item }) => {
+  if (!session) return { ok: false, error: '세션이 없습니다.' };
+  session.setPin(action === 'unpin' ? 'unpin' : 'pin', item);
   return { ok: true };
 });
 
@@ -230,10 +238,13 @@ function mimeFromName(name) {
 }
 
 // 파일 경로 목록을 읽어 세션으로 전송. (다이얼로그 선택 또는 드래그&드롭에서 사용)
-ipcMain.handle('send-files', async (_e, paths) => {
+ipcMain.handle('send-files', async (_e, payload) => {
   if (!session) return { ok: false, error: '세션이 없습니다.' };
+  const { paths, replyTo } = (payload && typeof payload === 'object' && !Array.isArray(payload))
+    ? payload : { paths: payload, replyTo: null };
   const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean);
   const results = [];
+  let firstSent = false;
   for (const p of list) {
     try {
       const stat = fs.statSync(p);
@@ -244,10 +255,12 @@ ipcMain.handle('send-files', async (_e, paths) => {
       }
       const buf = fs.readFileSync(p);
       const filename = path.basename(p);
+      // 답장 인용은 첫 파일에만 붙인다 (여러 장 보낼 때 인용 중복 방지)
       session.sendFile({
         filename, mime: mimeFromName(filename), size: stat.size,
         data: buf.toString('base64'),
-      });
+      }, firstSent ? null : (replyTo || null));
+      firstSent = true;
       results.push({ path: p, ok: true });
     } catch (err) {
       results.push({ path: p, ok: false, error: String(err.message || err) });

@@ -108,6 +108,9 @@ button { font-family: inherit; }
 .mini:hover { background: #3a3e50; }
 .mini.danger { border-color: var(--danger); color: var(--danger); }
 .mini.danger:hover { background: var(--danger); color: #fff; }
+.mini.accent { border-color: var(--accent); color: var(--accent); }
+.mini.accent:hover { background: var(--accent); color: #fff; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
 .room-list { list-style: none; max-height: 260px; overflow: auto; }
 .room-list li {
   display: flex; justify-content: space-between; align-items: center;

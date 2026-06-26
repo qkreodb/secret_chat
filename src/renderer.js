@@ -299,6 +299,7 @@ function renderPinBar(list) {
 $('btnLeave').addEventListener('click', async () => {
   await api.leaveRoom();
   closeEmoji();
+  closeRps();
   showView('view-menu');
   toast('방에서 나갔습니다.');
 });
@@ -643,8 +644,123 @@ api.onUsers((users) => renderUsers(users));
 api.onDisconnected((info) => {
   addSystem(info.reason || '연결이 종료되었습니다.');
   toast('연결이 종료되었습니다.');
+  closeRps();
 });
 api.onNetError((msg) => toast('네트워크: ' + msg));
+
+// ---------------------------------------------------------------------------
+// 가위바위보 게임
+// ---------------------------------------------------------------------------
+const RPS_EMOJI = { rock: '✊', paper: '✋', scissors: '✌' };
+const RPS_KOR = { rock: '바위', paper: '보', scissors: '가위' };
+
+let rpsGameId = null;   // 현재 게임 id
+let rpsInGame = false;  // 내가 이 게임의 (초기) 참가자인가
+let rpsAlive = false;   // 아직 살아있는가
+let rpsPicked = false;  // 이번 라운드에 이미 냈는가
+
+function openRps() { $('rpsModal').classList.remove('hidden'); }
+function closeRps() {
+  $('rpsModal').classList.add('hidden');
+  rpsGameId = null; rpsInGame = false; rpsAlive = false; rpsPicked = false;
+}
+function setRpsChoicesEnabled(enabled) {
+  document.querySelectorAll('.rps-choice').forEach((b) => {
+    b.disabled = !enabled;
+    b.classList.remove('picked');
+  });
+}
+
+// 시작 버튼 — 모든 참여자에게 가위바위보 알림이 감 (jetson 등 제외자는 제외)
+$('btnRps').addEventListener('click', () => { api.rpsStart(); });
+
+// 선택(가위/바위/보) 버튼
+document.querySelectorAll('.rps-choice').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (rpsPicked || !rpsAlive) return;
+    const move = btn.dataset.move;
+    rpsPicked = true;
+    api.rpsPick(move, rpsGameId);
+    setRpsChoicesEnabled(false);
+    btn.classList.add('picked');
+    $('rpsStatus').textContent = `${RPS_EMOJI[move]} ${RPS_KOR[move]} 선택 완료 — 다른 사람을 기다리는 중...`;
+  });
+});
+
+$('rpsClose').addEventListener('click', closeRps);
+
+api.onRpsInvite((m) => {
+  const amPlayer = Array.isArray(m.players) && m.players.includes(myName);
+  if (amPlayer) {
+    rpsGameId = m.gameId;
+    rpsInGame = true;
+    rpsAlive = true;
+    rpsPicked = false;
+    $('rpsResult').textContent = '';
+    $('rpsClose').classList.add('hidden');
+    setRpsChoicesEnabled(true);
+    $('rpsStatus').textContent = `라운드 ${m.round} · 참가자 ${m.players.length}명 — 낼 것을 고르세요!`;
+    openRps();
+  } else if (rpsInGame) {
+    // 이미 탈락했지만 게임은 진행 중 → 관전
+    rpsAlive = false;
+    setRpsChoicesEnabled(false);
+    $('rpsStatus').textContent = `탈락 — 라운드 ${m.round} 관전 중 (남은 ${m.players.length}명)`;
+  }
+  // 그 외(jetson 등 제외자)는 알림을 받지 않음
+});
+
+api.onRpsProgress((m) => {
+  if (!rpsInGame || m.gameId !== rpsGameId || !rpsAlive) return;
+  if (rpsPicked) {
+    $('rpsStatus').textContent = `선택 완료 — ${m.picked.length}/${m.total}명 제출함`;
+  } else {
+    $('rpsStatus').textContent = `라운드 ${m.round} — 낼 것을 고르세요! (${m.picked.length}/${m.total}명 제출)`;
+  }
+});
+
+api.onRpsRound((m) => {
+  if (!rpsInGame || m.gameId !== rpsGameId) return;
+  const picksLine = Object.entries(m.picks || {})
+    .map(([n, mv]) => `${n} ${RPS_EMOJI[mv] || '?'}`).join('   ');
+  const lines = [m.draw ? `라운드 ${m.round} · 무승부! 다시 합니다` : `라운드 ${m.round} 결과`];
+  if (picksLine) lines.push(picksLine);
+  if (m.eliminated && m.eliminated.length) lines.push(`❌ 탈락: ${m.eliminated.join(', ')}`);
+  $('rpsResult').textContent = lines.join('\n');
+  setRpsChoicesEnabled(false);
+  if (m.eliminated && m.eliminated.includes(myName)) {
+    rpsAlive = false;
+    $('rpsStatus').textContent = '아쉽지만 탈락했습니다 😢';
+  } else if (rpsAlive) {
+    $('rpsStatus').textContent = m.draw ? '비겼어요! 다음 라운드 준비...' : '진출! 다음 라운드 준비...';
+  }
+});
+
+api.onRpsOver((m) => {
+  if (!rpsInGame || m.gameId !== rpsGameId) return;
+  setRpsChoicesEnabled(false);
+  const iWon = m.winner === myName;
+  $('rpsStatus').textContent = iWon
+    ? '🏆 우승! 축하합니다!'
+    : (m.winner ? `🏆 우승자: ${m.winner}` : '게임 종료');
+  $('rpsClose').classList.remove('hidden');
+  addSystem(`🏆 가위바위보 우승: ${m.winner || '없음'}`);
+  rpsAlive = false;
+  rpsInGame = false; // 게임 종료(모달은 닫기 전까지 결과 유지)
+});
+
+api.onRpsCancel((m) => {
+  if (!rpsInGame) {
+    // 시작 자체가 거부됨(참가자 부족 등)
+    toast(m.reason || '가위바위보가 취소되었습니다.');
+    return;
+  }
+  $('rpsStatus').textContent = m.reason || '가위바위보가 취소되었습니다.';
+  $('rpsResult').textContent = '';
+  setRpsChoicesEnabled(false);
+  $('rpsClose').classList.remove('hidden');
+  rpsInGame = false; rpsAlive = false;
+});
 
 // ---------------------------------------------------------------------------
 // 창 제어 (REQ-007, REQ-008, REQ-009)

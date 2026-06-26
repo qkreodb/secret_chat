@@ -113,6 +113,7 @@
           </div>
           <div class="head-actions">
             <button id="btnLunch" class="mini accent">점심</button>
+            <button id="btnRps" class="mini accent">가위바위보</button>
             <button id="btnLeave" class="mini danger">나가기</button>
           </div>
         </div>
@@ -145,6 +146,21 @@
     </section>
 
   </main>
+
+  <!-- 가위바위보 게임 모달 -->
+  <div id="rpsModal" class="rps-modal hidden">
+    <div class="rps-box">
+      <div class="rps-title">✊✋✌ 가위바위보</div>
+      <div id="rpsStatus" class="rps-status"></div>
+      <div id="rpsResult" class="rps-result"></div>
+      <div class="rps-choices">
+        <button class="rps-choice" data-move="rock"><span class="rps-emoji">✊</span><span class="rps-label">바위</span></button>
+        <button class="rps-choice" data-move="paper"><span class="rps-emoji">✋</span><span class="rps-label">보</span></button>
+        <button class="rps-choice" data-move="scissors"><span class="rps-emoji">✌</span><span class="rps-label">가위</span></button>
+      </div>
+      <button id="rpsClose" class="mini hidden">닫기</button>
+    </div>
+  </div>
 
   <div id="toast" class="toast"></div>
   <div id="ctxMenu" class="ctx-menu hidden"></div>

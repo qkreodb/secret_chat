@@ -122,6 +122,11 @@ function wireSession(s) {
     if (!m.self) notifyIfBackground(`${m.username} (${currentRoomName})`, `📎 ${m.filename}`);
   });
   s.on('pin', (m) => send('pin-update', m));
+  s.on('rps-invite', (m) => send('rps-invite', m));
+  s.on('rps-progress', (m) => send('rps-progress', m));
+  s.on('rps-round', (m) => send('rps-round', m));
+  s.on('rps-over', (m) => send('rps-over', m));
+  s.on('rps-cancel', (m) => send('rps-cancel', m));
   s.on('system', (m) => send('system-message', m));
   s.on('users', (users) => send('users-update', users));
   s.on('error', (err) => send('net-error', String(err.message || err)));
@@ -286,6 +291,19 @@ ipcMain.handle('save-file', async (_e, { filename, data }) => {
 
 ipcMain.handle('leave-room', () => {
   teardownSession();
+  return { ok: true };
+});
+
+// 가위바위보 (호스트/클라이언트 공통 인터페이스)
+ipcMain.handle('rps-start', () => {
+  if (!session) return { ok: false, error: '세션이 없습니다.' };
+  session.rpsStart();
+  return { ok: true };
+});
+
+ipcMain.handle('rps-pick', (_e, { move, gameId }) => {
+  if (!session) return { ok: false, error: '세션이 없습니다.' };
+  session.rpsPick(move, gameId);
   return { ok: true };
 });
 

@@ -111,6 +111,35 @@ button { font-family: inherit; }
 .mini.accent { border-color: var(--accent); color: var(--accent); }
 .mini.accent:hover { background: var(--accent); color: #fff; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ---------- 가위바위보 모달 ---------- */
+.rps-modal {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.rps-modal.hidden { display: none; }
+.rps-box {
+  width: 320px; max-width: 90vw; text-align: center;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 14px;
+  padding: 20px 22px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.rps-title { font-weight: 700; font-size: 16px; margin-bottom: 10px; }
+.rps-status { color: var(--muted); font-size: 13px; min-height: 18px; margin-bottom: 10px; }
+.rps-result { font-size: 13px; line-height: 1.5; margin-bottom: 12px; white-space: pre-line; }
+.rps-result:empty { margin-bottom: 0; }
+.rps-choices { display: flex; gap: 10px; justify-content: center; margin-bottom: 14px; }
+.rps-choice {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: var(--bg3); border: 1px solid var(--line); color: var(--txt);
+  border-radius: 10px; padding: 12px 0; cursor: pointer;
+}
+.rps-choice .rps-emoji { font-size: 28px; line-height: 1; }
+.rps-choice .rps-label { font-size: 12px; }
+.rps-choice:hover:not(:disabled) { border-color: var(--accent); }
+.rps-choice:disabled { opacity: 0.4; cursor: default; }
+.rps-choice.picked { border-color: var(--accent); background: var(--accent); color: #fff; }
+#rpsClose.hidden { display: none; }
 .room-list { list-style: none; max-height: 260px; overflow: auto; }
 .room-list li {
   display: flex; justify-content: space-between; align-items: center;

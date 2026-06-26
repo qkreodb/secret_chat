@@ -22,6 +22,10 @@ contextBridge.exposeInMainWorld('chatAPI', {
   // 고정(핀)
   setPin: (action, item) => ipcRenderer.invoke('set-pin', { action, item }),
 
+  // 가위바위보
+  rpsStart: () => ipcRenderer.invoke('rps-start'),
+  rpsPick: (move, gameId) => ipcRenderer.invoke('rps-pick', { move, gameId }),
+
   // 창 제어
   setAlwaysOnTop: (v) => ipcRenderer.invoke('set-always-on-top', v),
   setOpacity: (v) => ipcRenderer.invoke('set-opacity', v),
@@ -35,4 +39,11 @@ contextBridge.exposeInMainWorld('chatAPI', {
   onUsers: (cb) => ipcRenderer.on('users-update', (_e, u) => cb(u)),
   onDisconnected: (cb) => ipcRenderer.on('disconnected', (_e, m) => cb(m)),
   onNetError: (cb) => ipcRenderer.on('net-error', (_e, m) => cb(m)),
+
+  // 가위바위보 이벤트
+  onRpsInvite: (cb) => ipcRenderer.on('rps-invite', (_e, m) => cb(m)),
+  onRpsProgress: (cb) => ipcRenderer.on('rps-progress', (_e, m) => cb(m)),
+  onRpsRound: (cb) => ipcRenderer.on('rps-round', (_e, m) => cb(m)),
+  onRpsOver: (cb) => ipcRenderer.on('rps-over', (_e, m) => cb(m)),
+  onRpsCancel: (cb) => ipcRenderer.on('rps-cancel', (_e, m) => cb(m)),
 });

@@ -31,6 +31,26 @@ function newId() {
   return crypto.randomBytes(8).toString('hex');
 }
 
+// ---------------------------------------------------------------------------
+// 가위바위보(RPS) 설정/유틸
+// ---------------------------------------------------------------------------
+const RPS_MOVES = ['rock', 'paper', 'scissors'];
+const RPS_ROUND_MS = 30000;       // 라운드 제한시간(이후 미선택자는 기권 처리)
+const RPS_NEXT_DELAY_MS = 2500;   // 라운드 결과를 보여주고 다음 라운드로 넘어가는 텀
+
+// 서버 역할 등 게임에서 제외할 접속자 이름(소문자 비교). 여기에 이름을 추가하면 됨.
+const RPS_EXCLUDED = ['jetson'];
+function isRpsExcluded(name) {
+  return RPS_EXCLUDED.includes(String(name || '').trim().toLowerCase());
+}
+
+// x가 y를 이기는가?
+function rpsBeats(x, y) {
+  return (x === 'rock' && y === 'scissors')
+    || (x === 'scissors' && y === 'paper')
+    || (x === 'paper' && y === 'rock');
+}
+
 // 답장 인용 정보를 안전한 형태로 정규화 (없으면 null).
 function sanitizeReply(r) {
   if (!r || typeof r !== 'object') return null;
@@ -147,6 +167,7 @@ class HostSession extends EventEmitter {
     this.server = null;
     this.udp = null;
     this.pinned = new Map();   // id -> 핀 항목 (입장 순서 유지)
+    this.rps = null;           // 진행 중인 가위바위보 게임 상태 (없으면 null)
   }
 
   pinnedList() {
@@ -212,6 +233,155 @@ class HostSession extends EventEmitter {
     };
     this.broadcast(msg);
     this.emit('file', { ...msg, self: true });
+  }
+
+  // -------------------------------------------------------------------------
+  // 가위바위보 (호스트 권위) — 최후의 1인이 남을 때까지 라운드 반복
+  // -------------------------------------------------------------------------
+  rpsStart() { this._rpsStart(); }
+
+  rpsPick(move, gameId) {
+    // 방장 본인의 선택
+    this._rpsRecordPick(this.username, move, gameId);
+  }
+
+  _rpsReset() {
+    if (this.rps && this.rps.timer) { clearTimeout(this.rps.timer); }
+    this.rps = null;
+  }
+
+  _rpsStart() {
+    if (this.rps && this.rps.active) return; // 이미 진행 중이면 무시
+    const eligible = this.userList().filter((n) => !isRpsExcluded(n));
+    if (eligible.length < 2) {
+      const reason = '가위바위보를 시작하려면 참가자가 2명 이상이어야 합니다.';
+      this.broadcast({ type: 'RPS_CANCEL', reason });
+      this.emit('rps-cancel', { reason });
+      return;
+    }
+    this.rps = {
+      active: true, gameId: newId(), round: 0,
+      alive: new Set(eligible), picks: new Map(), timer: null,
+    };
+    this._rpsNewRound();
+  }
+
+  _rpsNewRound() {
+    const g = this.rps;
+    if (!g || !g.active) return;
+    g.round += 1;
+    g.picks = new Map();
+    if (g.timer) clearTimeout(g.timer);
+    const payload = {
+      type: 'RPS_INVITE', gameId: g.gameId, round: g.round, players: [...g.alive],
+    };
+    this.broadcast(payload);
+    this.emit('rps-invite', payload);
+    g.timer = setTimeout(() => this._rpsResolve(), RPS_ROUND_MS);
+  }
+
+  _rpsRecordPick(username, move, gameId) {
+    const g = this.rps;
+    if (!g || !g.active) return;
+    if (gameId && gameId !== g.gameId) return; // 지난 게임의 늦은 선택 무시
+    if (!g.alive.has(username)) return;        // 탈락/제외자
+    if (!RPS_MOVES.includes(move)) return;
+    if (g.picks.has(username)) return;         // 이미 냈음
+    g.picks.set(username, move);
+
+    // 진행상황 알림(누가 냈는지만, 무엇을 냈는지는 비공개)
+    const prog = {
+      type: 'RPS_PROGRESS', gameId: g.gameId, round: g.round,
+      picked: [...g.picks.keys()], total: g.alive.size,
+    };
+    this.broadcast(prog);
+    this.emit('rps-progress', prog);
+
+    // 살아있는 전원이 제출하면 즉시 판정
+    let all = true;
+    for (const p of g.alive) { if (!g.picks.has(p)) { all = false; break; } }
+    if (all) this._rpsResolve();
+  }
+
+  _rpsResolve() {
+    const g = this.rps;
+    if (!g || !g.active) return;
+    if (g.timer) { clearTimeout(g.timer); g.timer = null; }
+
+    const aliveArr = [...g.alive];
+    const picked = aliveArr.filter((p) => g.picks.has(p));
+    const abstained = aliveArr.filter((p) => !g.picks.has(p)); // 미선택 → 기권(탈락)
+
+    if (picked.length === 0) {
+      const reason = '아무도 내지 않아 가위바위보가 취소되었습니다.';
+      this.broadcast({ type: 'RPS_CANCEL', reason });
+      this.emit('rps-cancel', { reason });
+      this._rpsReset();
+      return;
+    }
+
+    const picksObj = {};
+    for (const p of picked) picksObj[p] = g.picks.get(p);
+
+    let advancing;
+    let eliminated = [...abstained];
+    let draw = false;
+    const moves = new Set(picked.map((p) => g.picks.get(p)));
+    if (moves.size === 2) {
+      const [a, b] = [...moves];
+      const winMove = rpsBeats(a, b) ? a : b;
+      advancing = picked.filter((p) => g.picks.get(p) === winMove);
+      eliminated = eliminated.concat(picked.filter((p) => g.picks.get(p) !== winMove));
+    } else {
+      // 1종(전원 동일) 또는 3종(가위·바위·보 모두) → 무승부: 제출자 전원 생존
+      advancing = picked;
+      draw = true;
+    }
+    g.alive = new Set(advancing);
+
+    const result = {
+      type: 'RPS_ROUND', gameId: g.gameId, round: g.round,
+      picks: picksObj, advancing, eliminated, abstained, draw,
+    };
+    this.broadcast(result);
+    this.emit('rps-round', result);
+
+    if (g.alive.size <= 1) {
+      const over = { type: 'RPS_OVER', gameId: g.gameId, winner: advancing[0] || null };
+      this.broadcast(over);
+      this.emit('rps-over', over);
+      this._rpsReset();
+    } else {
+      const gid = g.gameId;
+      setTimeout(() => {
+        if (this.rps && this.rps.active && this.rps.gameId === gid) this._rpsNewRound();
+      }, RPS_NEXT_DELAY_MS);
+    }
+  }
+
+  // 게임 도중 접속자가 나갔을 때 정리
+  _rpsHandleLeave(name) {
+    const g = this.rps;
+    if (!g || !g.active || !name || !g.alive.has(name)) return;
+    g.alive.delete(name);
+    g.picks.delete(name);
+    if (g.alive.size === 1) {
+      const over = { type: 'RPS_OVER', gameId: g.gameId, winner: [...g.alive][0], reason: '상대 퇴장' };
+      this.broadcast(over);
+      this.emit('rps-over', over);
+      this._rpsReset();
+      return;
+    }
+    if (g.alive.size === 0) {
+      const reason = '참가자가 모두 나가 가위바위보가 취소되었습니다.';
+      this.broadcast({ type: 'RPS_CANCEL', reason });
+      this.emit('rps-cancel', { reason });
+      this._rpsReset();
+      return;
+    }
+    let all = true;
+    for (const p of g.alive) { if (!g.picks.has(p)) { all = false; break; } }
+    if (all) this._rpsResolve();
   }
 
   start() {
@@ -301,6 +471,16 @@ class HostSession extends EventEmitter {
 
       if (msg.type === 'PIN') {
         this.setPin(msg.action, msg.item); // 권위적 적용 + 전체 동기화
+        return;
+      }
+
+      if (msg.type === 'RPS_START') {
+        this._rpsStart();
+        return;
+      }
+
+      if (msg.type === 'RPS_PICK') {
+        this._rpsRecordPick(info.username, msg.move, msg.gameId);
       }
     };
 
@@ -315,6 +495,7 @@ class HostSession extends EventEmitter {
           this.broadcast({ type: 'SYSTEM', text: sysText, ts: Date.now() });
           this.emit('system', { text: sysText, ts: Date.now() });
           this.pushUsers();
+          this._rpsHandleLeave(name); // 게임 중 퇴장 처리
         }
       }
     };
@@ -356,6 +537,7 @@ class HostSession extends EventEmitter {
   }
 
   stop() {
+    this._rpsReset();
     for (const sock of this.clients.keys()) {
       try { sock.destroy(); } catch (_) {}
     }
@@ -475,7 +657,31 @@ class ClientSession extends EventEmitter {
       case 'PIN':
         this.emit('pin', { action: msg.action, item: msg.item, pinned: msg.pinned || [] });
         break;
+      case 'RPS_INVITE':
+        this.emit('rps-invite', msg);
+        break;
+      case 'RPS_PROGRESS':
+        this.emit('rps-progress', msg);
+        break;
+      case 'RPS_ROUND':
+        this.emit('rps-round', msg);
+        break;
+      case 'RPS_OVER':
+        this.emit('rps-over', msg);
+        break;
+      case 'RPS_CANCEL':
+        this.emit('rps-cancel', msg);
+        break;
     }
+  }
+
+  // 가위바위보: 요청/선택을 방장에게 전달 (판정은 방장이 권위적으로 수행)
+  rpsStart() {
+    sendJSON(this.socket, { type: 'RPS_START' });
+  }
+
+  rpsPick(move, gameId) {
+    sendJSON(this.socket, { type: 'RPS_PICK', move, gameId });
   }
 
   sendChat(text, replyTo) {

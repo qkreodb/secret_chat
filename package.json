@@ -31,6 +31,11 @@
       "target": "nsis",
       "icon": "assets/icon.ico"
     },
+    "nsis": {
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Secret LAN Chat"
+    },
     "linux": {
       "target": [
         "AppImage",

@@ -1,0 +1,44 @@
+name: Build & Release
+
+# vX.Y.Z 형태의 태그를 push 하면 Windows/Linux 빌드를 만들어
+# GitHub Releases에 게시한다. 게시된 산출물(latest.yml 등)을 보고
+# 설치된 앱이 electron-updater로 자동 업데이트된다.
+on:
+  push:
+    tags:
+      - 'v*'
+
+# electron-builder가 Release를 생성/업로드할 수 있도록 쓰기 권한 부여
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & publish (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --x64 --publish always
+
+      - name: Build & publish (Linux x64 + arm64)
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux --x64 --arm64 --publish always

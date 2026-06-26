@@ -10,6 +10,8 @@ const {
   HostSession, ClientSession, discoverRooms, getLocalIPv4, MAX_FILE_BYTES,
 } = require('./network');
 
+const { initAutoUpdate } = require('./updater');
+
 // Windows 토스트 알림에 앱 이름이 제대로 뜨도록 AppUserModelID 지정
 app.setAppUserModelId('com.local.secretlanchat');
 
@@ -322,6 +324,7 @@ if (!gotLock) {
   app.whenReady().then(() => {
     createWindow();
     createTray();
+    initAutoUpdate(() => mainWindow);
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
